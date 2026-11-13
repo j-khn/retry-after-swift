@@ -19,7 +19,7 @@ public enum RetryAfterParser {
     /// Parses one Retry-After field value. Pass the current wall clock
     /// explicitly in tests so date-based values are deterministic.
     public static func parse(_ field: String, now: Date = Date()) -> RetryDelay? {
-        let value = field.trimmingCharacters(in: CharacterSet(charactersIn: " 	"))
+        let value = field.trimmingCharacters(in: CharacterSet(charactersIn: " \t"))
         guard !value.isEmpty else { return nil }
 
         let bytes = Array(value.utf8)
