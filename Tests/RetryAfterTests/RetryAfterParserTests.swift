@@ -9,7 +9,7 @@ final class RetryAfterParserTests: XCTestCase {
 
     func testDeltaSecondsTrimsWhitespaceAndRejectsOverflow() {
         let now = date("2015-10-21T07:27:00Z")
-        XCTAssertEqual(RetryAfterParser.parse("  12	", now: now)?.seconds, 12)
+        XCTAssertEqual(RetryAfterParser.parse("  12\t", now: now)?.seconds, 12)
         XCTAssertNil(RetryAfterParser.parse("-1", now: now))
         XCTAssertNil(RetryAfterParser.parse("9223372036854775808", now: now))
     }
