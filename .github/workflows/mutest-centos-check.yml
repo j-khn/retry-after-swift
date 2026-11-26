@@ -39,7 +39,7 @@ jobs:
           echo /opt/swift/usr/bin >> "$GITHUB_PATH"
       - name: Run the remote mutation action
         id: mutation
-        uses: j-khn/mutest-swift/.github/actions/run-mutation-testing@862837ce5d008a3b39f601efcc27ec48e2fa1870
+        uses: j-khn/mutest-swift/.github/actions/run-mutation-testing@a54d7e450989dad565b215fd946e12a65a8bccb8
         with:
           project: .
           project-kind: swift-package
