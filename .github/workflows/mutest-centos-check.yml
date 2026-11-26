@@ -1,0 +1,65 @@
+name: Cross-repository CentOS mutation check
+
+on:
+  push:
+    branches: [codex/mutest-centos-action-check]
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    container: quay.io/centos/centos:stream10
+    timeout-minutes: 30
+    steps:
+      - name: Install prerequisites
+        run: >-
+          dnf -y install git gcc gcc-c++ libcurl-devel libedit-devel libuuid-devel
+          libxml2-devel ncurses-devel python3-devel sqlite-devel zlib-devel tar gzip
+          which findutils gnupg2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Swift 6.4.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$(mktemp -d)"
+          swift_url=https://download.swift.org/swift-6.4.3-release/ubi10/swift-6.4.3-RELEASE/swift-6.4.3-RELEASE-ubi10.tar.gz
+          curl --fail --location --retry 3 "$swift_url" --output /tmp/swift.tar.gz
+          curl --fail --location --retry 3 "$swift_url.sig" --output /tmp/swift.tar.gz.sig
+          curl --fail --location --compressed --retry 3 https://www.swift.org/keys/all-keys.asc --output /tmp/swift-keys.asc
+          gpg --batch --quiet --import /tmp/swift-keys.asc
+          gpg --batch --status-fd 1 --verify /tmp/swift.tar.gz.sig /tmp/swift.tar.gz > /tmp/swift-signature-status
+          grep -E '^\[GNUPG:\] VALIDSIG .*52BB7E3DE28A71BE22EC05FFEF80A866B47A981F' /tmp/swift-signature-status
+          mkdir -p /opt/swift
+          tar -xzf /tmp/swift.tar.gz -C /opt/swift --strip-components=1
+          rm -rf "$GNUPGHOME" /tmp/swift.tar.gz /tmp/swift.tar.gz.sig /tmp/swift-keys.asc
+          echo /opt/swift/usr/bin >> "$GITHUB_PATH"
+      - name: Run the remote mutation action
+        id: mutation
+        uses: j-khn/mutest-swift/.github/actions/run-mutation-testing@862837ce5d008a3b39f601efcc27ec48e2fa1870
+        with:
+          project: .
+          project-kind: swift-package
+          source-commit: ${{ github.sha }}
+          source-base: origin/master
+          source-scope: changed
+          test-scope: changed-and-matching
+          operators: boolean
+          workers: '1'
+      - name: Check report scope
+        env:
+          RUN_STATUS: ${{ steps.mutation.outputs.run-status }}
+          REPORT_DIRECTORY: ${{ steps.mutation.outputs.report-directory }}
+        run: |
+          test "$RUN_STATUS" = completed
+          python3 - "$REPORT_DIRECTORY/report.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1]) as f:
+              report = json.load(f)
+          assert report['scope']['sources'] == ['Sources/RetryAfter/RetryAfterParser.swift'], report['scope']
+          assert any('RetryAfterParserTests/' in name for name in report['scope']['tests']), report['scope']
+          assert report['summary']['generated'] > 0, report['summary']
+          PY
